@@ -17,7 +17,7 @@ on:
       LAN_IP:
         description: 'Set LAN IP Address'
         required: true
-        default: '192.168.1.1'
+        default: '192.168.6.1'
       WIFI_DRIVER:
         description: 'Choose WiFi Driver'
         required: true
@@ -26,14 +26,6 @@ on:
         options:
         - v7.6.7.2
         - v7.6.6.1
-      SW_DRIVER:
-        description: 'Choose Switch Driver'
-        required: true
-        default: 'GSW'
-        type: choice
-        options:
-        - GSW
-        - DSA
       APP_MTK:
         description: 'Use luci-app-mtk wifi config'
         required: true
@@ -56,10 +48,10 @@ env:
   OPENWRT_NAME: hanwckf
   REPO_URL: https://github.com/hanwckf/immortalwrt-mt798x
   REPO_BRANCH: openwrt-21.02
-  FEEDS_CONF: JDCloud-AX6000-Baili-hanwckf/feeds.conf.default
-  CONFIG_FILE: JDCloud-AX6000-Baili-hanwckf/.mtwifi-cfg.config
-  DIY_P1_SH: JDCloud-AX6000-Baili-hanwckf/diy-part1.sh
-  DIY_P2_SH: JDCloud-AX6000-Baili-hanwckf/diy-part2.sh
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: .config
+  DIY_P1_SH: redmi_ax6000_hanwckf/diy-part1.sh
+  DIY_P2_SH: redmi_ax6000_hanwckf/diy-part2.sh
   SSH_ACTIONS: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
@@ -154,18 +146,7 @@ jobs:
         else
                 echo "Use WiFi Driver: v7.6.7.2"
         fi
-
-    - name: 设置交换机驱动
-      run: |
-        if [ ${{ github.event.inputs.SW_DRIVER }} == 'DSA' ]; then
-                cp JDCloud-AX6000-Baili-hanwckf/mt7986a-dsa-jdcloud-re-cp-03.dts openwrt/target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek/mt7986a-jdcloud-re-cp-03.dts
-                cd openwrt
-                sed -i '/jdcloud,re-cp-03)/ {n; /eth0/ {s/eth0/lan1 lan2 lan3 lan4/; n; /ucidef_add_switch/ d}}' target/linux/mediatek/mt7986/base-files/etc/board.d/02_network
-                echo "Use Switch Driver: DSA"
-        else
-                echo "Use Switch Driver: GSW"
-        fi
-
+        
     - name: 使用luci-app-mtk无线配置
       if: github.event.inputs.APP_MTK == 'true'
       run: |
@@ -213,11 +194,6 @@ jobs:
                 echo "WIFI_VERSION=-v7661" >> $GITHUB_ENV
         else
                 echo "WIFI_VERSION=-v7672" >> $GITHUB_ENV
-        fi
-        if sed -n '/jdcloud,re-cp-03)/,/;;/p' target/linux/mediatek/mt7986/base-files/etc/board.d/02_network | grep -q 'ucidef_add_switch "switch0"'; then
-                echo "SWITCH=-gsw" >> $GITHUB_ENV
-        else
-                echo "SWITCH=-dsa" >> $GITHUB_ENV
         fi
         if grep -q 'CONFIG_PACKAGE_mtwifi-cfg=y' .config; then
                 echo "WIFI_INTERFACE=-mtwifi" >> $GITHUB_ENV
