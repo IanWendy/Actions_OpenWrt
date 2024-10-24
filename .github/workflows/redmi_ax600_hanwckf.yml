@@ -7,35 +7,13 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 # Description: Build OpenWrt using GitHub Actions
 #
-###############手动修改##############
-name: REDMMI-AX6000-hanwckf
+###############改名字##############
+name: Redmi-AX6000-hanwckf
 
 on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
-      LAN_IP:
-        description: 'Set LAN IP Address'
-        required: true
-        default: '192.168.6.1'
-      WIFI_DRIVER:
-        description: 'Choose WiFi Driver'
-        required: true
-        default: 'v7.6.7.2'
-        type: choice
-        options:
-        - v7.6.7.2
-        - v7.6.6.1
-      APP_MTK:
-        description: 'Use luci-app-mtk wifi config'
-        required: true
-        default: false
-        type: boolean
-      NO_DOCKERMAN:
-        description: 'Not build luci-app-dockerman'
-        required: true
-        default: false
-        type: boolean
       ssh:
         description: 'SSH connection to Actions'
         required: false
@@ -44,26 +22,23 @@ on:
 #    - cron: 0 16 * * *
 
 env:
-  ###############手动修改##############
-  OPENWRT_NAME: hanwckf
   REPO_URL: https://github.com/hanwckf/immortalwrt-mt798x
   REPO_BRANCH: openwrt-21.02
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: .config
-  DIY_P1_SH: redmi_ax6000_hanwckf/diy-part1.sh
-  DIY_P2_SH: redmi_ax6000_hanwckf/diy-part2.sh
+  CONFIG_FILE: hanwckf/Redmi-AX6000/.config
+  DIY_P1_SH: hanwckf/Redmi-AX6000/diy-part1.sh
+  DIY_P2_SH: hanwckf/Redmi-AX6000/diy-part2.sh
   SSH_ACTIONS: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
+  ###############改名字##############
+  OPENWRT_NAME: hanwckf
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
-
-    permissions:
-      contents: write
-
+    runs-on: ubuntu-24.04
+    
     steps:
     - name: 检查项目分支
       uses: actions/checkout@main
@@ -80,88 +55,34 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-
-    - name: 清理磁盘空间(Ubuntu)
-      uses: jlumbroso/free-disk-space@main
-      with:
-        # this might remove tools that are actually needed,
-        # when set to "true" but frees about 6 GB
-        tool-cache: true
         
-        # all of these default to true, but feel free to set to
-        # "false" if necessary for your workflow
-        android: false
-        dotnet: false
-        haskell: false
-        large-packages: false
-        swap-storage: false
-
     - name: 下载固件源码
       working-directory: /workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
-
+         
     - name: 加载feeds.conf.default & DIY_P1_SH
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
-
+        
     - name: 更新 & 安装 feeds
       run: |
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-
+      
     - name: 加载config & DIY_P2_SH
       run: |
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-
-    - name: 设置LAN IP地址（路由器登录地址）
-      run: |
-        cd openwrt
-        SET_IP=${{ github.event.inputs.LAN_IP }}
-        if [[ $SET_IP =~ ^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; then
-            #修改immortalwrt.lan关联IP
-            sed -i "s/192\.168\.[0-9]*\.[0-9]*/$SET_IP/g" $(find feeds/luci/modules/luci-mod-system -type f -name "flash.js")
-            #修改默认IP地址
-            sed -i "s/192\.168\.[0-9]*\.[0-9]*/$SET_IP/g" package/base-files/files/bin/config_generate
-            echo "Set LAN IP Address: $SET_IP"
-        else
-            echo "Invalid IP address, use default."
-        fi
-
-    - name: 设置WiFi驱动版本
-      run: |
-        cd openwrt
-        if [ ${{ github.event.inputs.WIFI_DRIVER }} == 'v7.6.6.1' ]; then
-                sed -i 's/CONFIG_MTK_MT_WIFI_DRIVER_VERSION_7672=y/CONFIG_MTK_MT_WIFI_DRIVER_VERSION_7661=y/g' .config
-                echo "Use WiFi Driver: v7.6.6.1"
-        else
-                echo "Use WiFi Driver: v7.6.7.2"
-        fi
         
-    - name: 使用luci-app-mtk无线配置
-      if: github.event.inputs.APP_MTK == 'true'
-      run: |
-        cd openwrt
-        sed -i 's/CONFIG_PACKAGE_luci-app-mtwifi-cfg=y/CONFIG_PACKAGE_luci-app-mtk=y/g' .config
-        sed -i 's/CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn=y/CONFIG_PACKAGE_luci-i18n-mtk-zh-cn=y/g' .config
-        sed -i 's/CONFIG_PACKAGE_mtwifi-cfg=y/CONFIG_PACKAGE_wifi-profile=y/g' .config
-        sed -i 's/CONFIG_PACKAGE_lua-cjson=y/CONFIG_WIFI_NORMAL_SETTING=y/g' .config
-
-    - name: 取消编译dockerman
-      if: github.event.inputs.NO_DOCKERMAN == 'true'
-      run: |
-        cd openwrt
-        sed -i '/CONFIG_PACKAGE_luci-app-dockerman=y/d' .config
-
     - name: SSH链接管理
       uses: P3TERX/ssh2actions@v1.0.0
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
@@ -177,7 +98,7 @@ jobs:
         make download -j$(nproc)
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-
+        
     - name: 编译固件
       id: compile
       run: |
@@ -188,26 +109,9 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=$(cat DEVICE_NAME)" >> $GITHUB_ENV
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*TARGET_.*_(.*)_DEVICE_.*=y/\1/' > TARGET_NAME
         [ -s TARGET_NAME ] && echo "TARGET_NAME=$(cat TARGET_NAME)" >> $GITHUB_ENV
-        sed -n 's/.*lan) ipad=${ipaddr:-"\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)"} ;;.*/\1/p' package/base-files/files/bin/config_generate | head -n 1 > IP_ADDR
-        [ -s IP_ADDR ] && echo "IP_ADDR=$(cat IP_ADDR)" >> $GITHUB_ENV
-        if grep -q 'CONFIG_MTK_MT_WIFI_DRIVER_VERSION_7661=y' .config; then
-                echo "WIFI_VERSION=-v7661" >> $GITHUB_ENV
-        else
-                echo "WIFI_VERSION=-v7672" >> $GITHUB_ENV
-        fi
-        if grep -q 'CONFIG_PACKAGE_mtwifi-cfg=y' .config; then
-                echo "WIFI_INTERFACE=-mtwifi" >> $GITHUB_ENV
-        else
-                echo "WIFI_INTERFACE=" >> $GITHUB_ENV
-        fi
-        if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' .config; then
-                echo "BUILD_DOCKERMAN=-docker" >> $GITHUB_ENV
-        else
-                echo "BUILD_DOCKERMAN=" >> $GITHUB_ENV
-        fi
         echo "FILE_DATE=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
-
+        
     - name: 查看磁盘使用情况
       if: (!cancelled())
       run: df -hT
@@ -218,51 +122,51 @@ jobs:
       run: | 
         cd openwrt/bin/targets/*/*
         rm -rf packages
-        sudo -E apt-get -qq install rename
-        rename 's/.*${{ env.DEVICE_NAME }}/${{ env.FILE_DATE }}-${{ env.OPENWRT_NAME }}-${{ env.DEVICE_NAME }}${{ env.WIFI_VERSION }}${{ env.BUILD_DOCKERMAN }}/' *
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: 打包上传固件到Actions Artifacts
+      
+    - name: 上传固件到github
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: ${{ env.FILE_DATE }}-${{ env.OPENWRT_NAME }}-${{ env.DEVICE_NAME }}${{ env.WIFI_VERSION }}${{ env.BUILD_DOCKERMAN }}
+        name: ${{ env.FILE_DATE }}-${{ env.OPENWRT_NAME }}-${{ env.DEVICE_NAME }}
         path: ${{ env.FIRMWARE }}
 
-    - name: 生成固件Release标签
-      id: tag
+
+    - name: 生成 release 描述文件
+      id: prepare_release
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        touch release.txt
-        echo "- 使用源码：${{ env.REPO_URL }}" >> release.txt
-        echo "- 使用分支：${{ env.REPO_BRANCH }}" >> release.txt
-        echo "- 登录地址：${{ env.IP_ADDR }}" >> release.txt
-        if [[ "${{ env.WIFI_VERSION }}" == '-v7661' ]]; then
-               echo "- 使用WiFi驱动版本v7.6.6.1" >> release.txt
-        else
-               echo "- 使用WiFi驱动版本v7.6.7.2" >> release.txt
-        fi
-        if [[ "${{ env.WIFI_INTERFACE }}" == '-mtwifi' ]]; then
-                echo "- 使用hanwckf mtwifi-cfg原生luci无线配置工具" >> release.txt
-        else
-                echo "- 使用mtk-sdk luci-app-mtk无线配置工具" >> release.txt
-        fi
-        if [[ "${{ env.BUILD_DOCKERMAN }}" == '-docker' ]]; then
-                echo "- 已编译luci-app-dockerman" >> release.txt
-        else
-                echo "- 未编译luci-app-dockerman" >> release.txt
-        fi
-        echo "release_tag=${{ env.FILE_DATE }}-${{ env.OPENWRT_NAME }}-${{ env.DEVICE_NAME }}${{ env.WIFI_VERSION }}${{ env.BUILD_DOCKERMAN }}" >> $GITHUB_OUTPUT
+        echo "release_tag=Redmi-AX6000" >> $GITHUB_OUTPUT
+        cat <<EOF > release.txt
+        由衷感谢所有为 OpenWRT 无私奉献的大佬们
+        📥 固件下载
+        EOF
         echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: 发布固件至Release
-      uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.status == 'success' && !cancelled()
+    
+    - name: 发布至 GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: steps.prepare_release.outputs.status == 'success' && !cancelled()
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.ACTIONS_TRIGGER_PAT }}
       with:
         files: ${{ env.FIRMWARE }}/*
-        name: ${{ env.FILE_DATE }}-${{ env.OPENWRT_NAME }}-${{ env.DEVICE_NAME }}${{ env.WIFI_VERSION }}${{ env.BUILD_DOCKERMAN }}
-        tag_name: ${{ steps.tag.outputs.release_tag }}
+        name: ${{ env.FILE_DATE }}-${{ env.OPENWRT_NAME }}-${{ env.DEVICE_NAME }} 
+        tag_name: Redmi-AX6000
         body_path: release.txt
+    
+    - name: 删除旧的工作流
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        retain_days: 30
+        keep_minimum_runs: 3
+    
+    - name: 删除旧的 Releases 和 Tags
+      uses: dev-drprasad/delete-older-releases@v0.3.4
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      with:
+        keep_latest: 5
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
