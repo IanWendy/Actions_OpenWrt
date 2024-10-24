@@ -26,8 +26,8 @@ env:
   REPO_BRANCH: openwrt-21.02
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: redmi_ax6000_hanwckf/.config
-  DIY_P1_SH: redmi_ax6000_hanwckf/diy-part1.sh
-  DIY_P2_SH: redmi_ax6000_hanwckf/diy-part2.sh
+  DIY_P1_SH: redmi_ax6000_hanwckf/diy_part1.sh
+  DIY_P2_SH: redmi_ax6000_hanwckf/diy_part2.sh
   SSH_ACTIONS: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
